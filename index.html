@@ -1866,10 +1866,14 @@ class Component extends DCLogic {
       const capturarInformePDF = () => new Promise((resolve) => {
         if (!window.html2canvas || !window.jspdf) return resolve(null);
         const prevScreen = st.screen;
+        let done = false;
+        const finish = (val) => { if (done) return; done = true; this.setState({ screen: prevScreen, capturandoPDF: false }); resolve(val); };
+        const safety = setTimeout(() => finish(null), 15000);
         this.setState({ screen: "informe", capturandoPDF: true });
         setTimeout(() => {
+          try {
           const el = document.querySelector('[data-g="inf"]');
-          if (!el) { this.setState({ screen: prevScreen, capturandoPDF: false }); return resolve(null); }
+          if (!el) { clearTimeout(safety); return finish(null); }
           const CAPTURE_SCALE = 2;
           const elRect = el.getBoundingClientRect();
           // puntos de corte permitidos: el borde superior de cada bloque del informe (nunca mitad de tabla/párrafo)
@@ -1936,10 +1940,11 @@ class Component extends DCLogic {
               console.log("[PDF] factor=" + it.factor + " calidad=" + it.calidad + " → " + kb.toFixed(1) + " KB base64");
               if (kb <= TARGET_KB) break;
             }
-            this.setState({ screen: prevScreen, capturandoPDF: false });
+            clearTimeout(safety);
             console.log("[PDF] tamaño final base64:", (out.length / 1024).toFixed(1), "KB");
-            resolve(out);
-          }).catch(() => { this.setState({ screen: prevScreen, capturandoPDF: false }); resolve(null); });
+            finish(out);
+          }).catch(() => { clearTimeout(safety); finish(null); });
+          } catch (e) { console.error("[PDF] error de captura:", e); clearTimeout(safety); finish(null); }
         }, 400);
       });
       const seguirEnvio = (payloadCliente) => {
